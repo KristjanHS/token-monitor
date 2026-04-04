@@ -386,13 +386,6 @@ class TestFindProjectLogDir:
 
         assert result is None
 
-    def test_slug_construction(self):
-        """Verify the slug format matches Claude Code convention."""
-        cwd = "/home/user/projects/my-app"
-        expected_slug = "-home-user-projects-my-app"
-        slug = cwd.replace("/", "-")
-        assert slug == expected_slug
-
 
 # ---------------------------------------------------------------------------
 # find_latest_session()

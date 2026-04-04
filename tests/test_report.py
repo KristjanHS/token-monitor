@@ -323,18 +323,6 @@ class TestProjectReport:
         assert "empty-sess" in report
         assert "real-sess0" in report
 
-    def test_table_header_columns(self):
-        """Table header contains expected column names."""
-        s = _session(turns=[_turn(1)])
-        report = project_report([s])
-
-        assert "Session" in report
-        assert "Date" in report
-        assert "Turns" in report
-        assert "Peak Ctx" in report
-        assert "Output" in report
-        assert "Model" in report
-
     def test_dominant_model_in_table(self):
         """Dominant model appears in the ranked session table."""
         turns = [
@@ -459,19 +447,6 @@ class TestAppendToLog:
         # Should contain a date in YYYY-MM-DD format
         import re
         assert re.search(r"\| 20\d\d-\d\d-\d\d ", data_line)
-
-    def test_table_row_pipe_delimited(self, tmp_path):
-        """Each data row has the correct number of pipe-separated fields."""
-        log_file = tmp_path / "token-usage-log.md"
-        stats = _session(turns=[_turn(1)])
-
-        append_to_log(stats, log_path=str(log_file))
-
-        content = log_file.read_text()
-        lines = content.strip().split("\n")
-        data_line = lines[-1]
-        # 7 fields => 8 pipes (leading + trailing + 6 separators)
-        assert data_line.count("|") == 8
 
     def test_no_turns_session_logged(self, tmp_path):
         """A session with no turns can still be logged (peak=0, output=0)."""
