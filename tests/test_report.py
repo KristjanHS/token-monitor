@@ -456,8 +456,9 @@ class TestAppendToLog:
         content = log_file.read_text()
         lines = content.strip().split("\n")
         data_line = lines[-1]
-        # Should start with a pipe and a date (YYYY-MM-DD format)
-        assert data_line.startswith("| 20")
+        # Should contain a date in YYYY-MM-DD format
+        import re
+        assert re.search(r"\| 20\d\d-\d\d-\d\d ", data_line)
 
     def test_table_row_pipe_delimited(self, tmp_path):
         """Each data row has the correct number of pipe-separated fields."""

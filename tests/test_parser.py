@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import unittest.mock
 from pathlib import Path
 
 from token_monitor.parser import (
@@ -215,7 +216,7 @@ class TestSessionStats:
         """Only top 5 jumps are returned."""
         turns = [TurnUsage(i, i * 100, 0, 0, 10, "m") for i in range(1, 9)]
         stats = self._make_stats(turns=turns)
-        assert len(stats.context_jumps) <= 5
+        assert len(stats.context_jumps) == 5
 
     def test_context_jumps_empty_turns(self):
         stats = self._make_stats(turns=[])
@@ -453,7 +454,6 @@ class TestFindProjectLogDir:
                 return str(tmp_path) + p[1:]
             return original(p)
 
-        import unittest.mock
         with unittest.mock.patch("os.path.expanduser", side_effect=fake_expanduser):
             result = find_project_log_dir(fake_cwd)
 
@@ -469,7 +469,6 @@ class TestFindProjectLogDir:
                 return str(tmp_path) + p[1:]
             return original(p)
 
-        import unittest.mock
         with unittest.mock.patch("os.path.expanduser", side_effect=fake_expanduser):
             result = find_project_log_dir("/nonexistent/project/path")
 

@@ -468,13 +468,11 @@ class TestIntegration:
         # Context growth bars
         assert "Context growth:" in out
 
-    def test_full_session_with_log_append(self, tmp_path, capsys):
+    def test_full_session_with_log_append(self, tmp_path, capsys, monkeypatch):
         """End-to-end: session without --no-log appends to a log file."""
         log_file = tmp_path / "token-usage-log.md"
         jsonl = _make_jsonl(tmp_path / "logtest.jsonl")
 
-        # Point append_to_log to our temp file by passing it directly
-        # We'll use the real append_to_log via monkeypatch of the default path
         from token_monitor import report
 
         orig_append = report.append_to_log
@@ -482,15 +480,8 @@ class TestIntegration:
         def patched_append(stats, log_path=None):
             return orig_append(stats, log_path=str(log_file))
 
-        import token_monitor.cli as cli_mod
-
-        # Monkeypatch at the cli module level
-        old_ref = cli_mod.append_to_log
-        cli_mod.append_to_log = patched_append
-        try:
-            main(["session", jsonl])
-        finally:
-            cli_mod.append_to_log = old_ref
+        monkeypatch.setattr("token_monitor.cli.append_to_log", patched_append)
+        main(["session", jsonl])
 
         out = capsys.readouterr().out
         assert "Logged to" in out
