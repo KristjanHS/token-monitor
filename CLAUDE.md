@@ -1,10 +1,25 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What This Is
-
 A CLI tool for monitoring Claude Code token usage. Parses JSONL session logs to provide per-session and cross-project token usage analysis.
+
+## Information Recording Principles
+
+This file uses **progressive disclosure**. Keep it lean.
+
+| Level 1 (this file) | Level 2 (`docs/references/`) |
+|----------------------|------------------------------|
+| Core commands | Detailed SOPs |
+| Critical rules (with examples) | Edge case handling |
+| Architecture map (module -> purpose) | External format specs |
+| Reference trigger index | Historical decisions |
+
+When adding information: high-frequency or high-consequence -> Level 1. Everything else -> Level 2 with a trigger condition here.
+
+## Reference Index
+
+| Trigger | Document | Contents |
+|---------|----------|----------|
+| Modifying parser, debugging token counts | `docs/references/jsonl-format.md` | Usage field names, token types, log file paths |
 
 ## Key Commands
 
@@ -40,16 +55,18 @@ pytest tests/test_parser.py::test_name -q
 
 **Report** (`report.py`): Pure formatting. `session_report()` produces a text report with context growth bars and subagent summary. `project_report()` ranks sessions by peak context. `append_to_log()` writes a markdown table row to `~/.claude/token-usage-log.md`.
 
-**Key flow**: `find_project_log_dir(CWD)` → slug-based path lookup under `~/.claude/projects/` → `find_latest_session()` or `find_all_sessions()` → `parse_session()` → `session_report()`/`project_report()` → optional `append_to_log()`.
+**Key flow**: `find_project_log_dir(CWD)` -> slug-based path lookup under `~/.claude/projects/` -> `find_latest_session()` or `find_all_sessions()` -> `parse_session()` -> `session_report()`/`project_report()` -> optional `append_to_log()`.
 
-## JSONL Log Format (Claude Code)
+## Before Modifying Code
 
-Each assistant message contains `message.usage`:
-- `input_tokens` — new/uncached input
-- `cache_creation_input_tokens` — newly cached
-- `cache_read_input_tokens` — read from cache
-- `output_tokens` — generated output
-- Total context per turn = sum of the three input fields
+| You're changing... | Read first | Key pitfall |
+|--------------------|-----------|-------------|
+| Parser logic | `docs/references/jsonl-format.md` | Format is external — be defensive about missing/unexpected fields |
+| Report formatting | `report.py` | Pure formatting — no data logic belongs here |
+| CLI args/routing | `cli.py` | Two entry points must stay equivalent |
 
-Session logs live at: `~/.claude/projects/<project-slug>/<session-uuid>.jsonl`
-Subagent logs: `~/.claude/projects/<project-slug>/<session-uuid>/subagents/agent-*.jsonl`
+## Reference Trigger Index
+
+| Trigger | Document |
+|---------|----------|
+| Modifying parser, debugging token counts | `docs/references/jsonl-format.md` |
