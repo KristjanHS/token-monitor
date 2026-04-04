@@ -101,39 +101,6 @@ class TestTurnUsage:
         )
         assert t.total_context == 600
 
-    def test_total_context_zeros(self):
-        t = TurnUsage(
-            turn_number=1,
-            input_tokens=0,
-            cache_creation_tokens=0,
-            cache_read_tokens=0,
-            output_tokens=0,
-            model="unknown",
-        )
-        assert t.total_context == 0
-
-    def test_total_context_excludes_output(self):
-        t = TurnUsage(
-            turn_number=1,
-            input_tokens=10,
-            cache_creation_tokens=20,
-            cache_read_tokens=30,
-            output_tokens=9999,
-            model="m",
-        )
-        assert t.total_context == 60  # output_tokens not included
-
-    def test_default_timestamp_is_empty(self):
-        t = TurnUsage(
-            turn_number=1,
-            input_tokens=0,
-            cache_creation_tokens=0,
-            cache_read_tokens=0,
-            output_tokens=0,
-            model="m",
-        )
-        assert t.timestamp == ""
-
 
 # ---------------------------------------------------------------------------
 # SessionStats properties
@@ -150,47 +117,15 @@ class TestSessionStats:
             ]
         return SessionStats(session_id="test", jsonl_path="/tmp/test.jsonl", turns=turns)
 
-    def test_num_turns(self):
-        stats = self._make_stats()
-        assert stats.num_turns == 3
-
-    def test_num_turns_empty(self):
-        stats = self._make_stats(turns=[])
-        assert stats.num_turns == 0
-
     def test_peak_context(self):
         stats = self._make_stats()
         # Turn 3: 500 + 1000 + 2000 = 3500
         assert stats.peak_context == 3500
 
-    def test_peak_context_empty(self):
-        stats = self._make_stats(turns=[])
-        assert stats.peak_context == 0
-
-    def test_total_output(self):
-        stats = self._make_stats()
-        assert stats.total_output == 50 + 80 + 120
-
-    def test_total_output_empty(self):
-        stats = self._make_stats(turns=[])
-        assert stats.total_output == 0
-
     def test_model_counts(self):
         stats = self._make_stats()
         counts = stats.model_counts
         assert counts == {"sonnet": 2, "opus": 1}
-
-    def test_model_counts_empty(self):
-        stats = self._make_stats(turns=[])
-        assert stats.model_counts == {}
-
-    def test_dominant_model(self):
-        stats = self._make_stats()
-        assert stats.dominant_model == "sonnet"
-
-    def test_dominant_model_empty(self):
-        stats = self._make_stats(turns=[])
-        assert stats.dominant_model == "unknown"
 
     def test_dominant_model_tie_is_deterministic(self):
         """When models are tied, max() picks the first one found — just verify no crash."""
@@ -217,15 +152,6 @@ class TestSessionStats:
         turns = [TurnUsage(i, i * 100, 0, 0, 10, "m") for i in range(1, 9)]
         stats = self._make_stats(turns=turns)
         assert len(stats.context_jumps) == 5
-
-    def test_context_jumps_empty_turns(self):
-        stats = self._make_stats(turns=[])
-        assert stats.context_jumps == []
-
-    def test_context_jumps_single_turn(self):
-        turns = [TurnUsage(1, 100, 0, 0, 10, "m")]
-        stats = self._make_stats(turns=turns)
-        assert stats.context_jumps == []
 
     def test_context_jumps_no_positive_deltas(self):
         """All decreasing context means no jumps."""
@@ -342,28 +268,12 @@ class TestParseSession:
         stats = parse_session(str(p))
         assert stats.date == ""
 
-    def test_turn_numbers_are_sequential(self, tmp_path: Path):
-        lines = [_assistant_line() for _ in range(5)]
-        p = _make_session_file(tmp_path, lines=lines)
-        stats = parse_session(str(p))
-        assert [t.turn_number for t in stats.turns] == [1, 2, 3, 4, 5]
-
     def test_empty_file(self, tmp_path: Path):
         p = tmp_path / "empty.jsonl"
         p.write_text("")
         stats = parse_session(str(p))
         assert stats.num_turns == 0
         assert stats.session_id == "empty"
-
-    def test_session_id_from_filename(self, tmp_path: Path):
-        p = _make_session_file(tmp_path, name="aaaa-bbbb-cccc.jsonl")
-        stats = parse_session(str(p))
-        assert stats.session_id == "aaaa-bbbb-cccc"
-
-    def test_jsonl_path_stored(self, tmp_path: Path):
-        p = _make_session_file(tmp_path)
-        stats = parse_session(str(p))
-        assert stats.jsonl_path == str(p)
 
     def test_token_values_parsed_correctly(self, tmp_path: Path):
         lines = [

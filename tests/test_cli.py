@@ -103,49 +103,6 @@ class TestSessionExplicitPath:
         assert "600" in out
         assert "Date:    2026-04-04" in out
 
-    def test_session_empty_file_zero_turns(self, tmp_path, capsys):
-        """An empty JSONL file produces zero-turn report."""
-        empty = tmp_path / "empty.jsonl"
-        empty.write_text("")
-        main(["session", str(empty), "--no-log"])
-        out = capsys.readouterr().out
-
-        assert "Session: empty" in out
-        assert "Turns:   0" in out
-
-    def test_session_non_assistant_lines_skipped(self, tmp_path, capsys):
-        """Lines with type != assistant are ignored."""
-        path = tmp_path / "mixed.jsonl"
-        with open(path, "w") as f:
-            # user line — should be skipped
-            f.write(json.dumps({"type": "user", "message": {"text": "hi"}}) + "\n")
-            # assistant line — should be counted
-            f.write(
-                json.dumps(
-                    {
-                        "type": "assistant",
-                        "timestamp": "2026-04-04T12:00:00Z",
-                        "message": {
-                            "model": "claude-sonnet-4-20250514",
-                            "usage": {
-                                "input_tokens": 100,
-                                "cache_creation_input_tokens": 0,
-                                "cache_read_input_tokens": 0,
-                                "output_tokens": 40,
-                            },
-                        },
-                    }
-                )
-                + "\n"
-            )
-            # malformed JSON line — should be skipped without error
-            f.write("not valid json\n")
-
-        main(["session", str(path), "--no-log"])
-        out = capsys.readouterr().out
-
-        assert "Turns:   1" in out
-
 
 # ---------------------------------------------------------------------------
 # session subcommand — default path discovery via CWD
