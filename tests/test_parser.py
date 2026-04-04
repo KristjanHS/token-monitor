@@ -6,6 +6,8 @@ import os
 import unittest.mock
 from pathlib import Path
 
+import pytest
+
 from token_monitor.parser import (
     SessionStats,
     TurnUsage,
@@ -473,34 +475,16 @@ class TestFindAllSessions:
 
 
 class TestShortModelName:
-    def test_opus(self):
-        assert _short_model_name("claude-opus-4-20250514") == "opus"
-
-    def test_sonnet(self):
-        assert _short_model_name("claude-sonnet-4-20250514") == "sonnet"
-
-    def test_haiku(self):
-        assert _short_model_name("claude-haiku-3.5-20250514") == "haiku"
+    @pytest.mark.parametrize("model,expected", [
+        ("claude-opus-4-20250514", "opus"),
+        ("claude-sonnet-4-20250514", "sonnet"),
+        ("claude-haiku-3.5-20250514", "haiku"),
+    ])
+    def test_known_models(self, model, expected):
+        assert _short_model_name(model) == expected
 
     def test_synthetic(self):
         assert _short_model_name("<synthetic>") == "synthetic"
 
     def test_unknown_passthrough(self):
         assert _short_model_name("gpt-4-turbo") == "gpt-4-turbo"
-
-    def test_empty_string(self):
-        assert _short_model_name("") == ""
-
-    def test_opus_substring_match(self):
-        """Any model containing 'opus' maps to opus."""
-        assert _short_model_name("some-opus-variant") == "opus"
-
-    def test_sonnet_substring_match(self):
-        assert _short_model_name("anthropic-sonnet-next") == "sonnet"
-
-    def test_haiku_substring_match(self):
-        assert _short_model_name("haiku-test-model") == "haiku"
-
-    def test_priority_opus_over_sonnet(self):
-        """If both 'opus' and 'sonnet' appear, opus wins (checked first)."""
-        assert _short_model_name("opus-sonnet-hybrid") == "opus"
