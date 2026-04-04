@@ -1,6 +1,17 @@
 # token-monitor
 
-CLI tool for analyzing Claude Code token usage from JSONL session logs.
+Visibility into where Claude Code session tokens are spent — so you optimize the right things.
+
+## Why
+
+Optimization without visibility risks fixing the wrong things. Claude Code's JSONL session logs already contain rich per-turn token data (input, cache, output, model), but there's no built-in way to review it. This project provides that visibility through four components:
+
+1. **Analysis CLI** (`token-usage`) — parses JSONL logs into per-session and cross-project reports
+2. **Persistent log** (`~/.claude/token-usage-log.md`) — append-only markdown table of every analyzed session
+3. **Retro skill integration** (`~/.claude/skills/retro/SKILL.md`) — runs `token-usage session` automatically at end-of-session retrospectives, so usage is always logged
+4. **Token efficiency rules** (`~/.claude/CLAUDE.md`) — a small set of high-confidence rules that reduce unnecessary token consumption (targeted reads, quiet test runs, specific search patterns)
+
+The CLI is the centerpiece, but the global configs are what make it a system — usage gets logged automatically and Claude follows efficiency rules without being reminded.
 
 ## Install
 
@@ -60,18 +71,6 @@ The `session` command appends a summary row to `~/.claude/token-usage-log.md` (c
 ## Session discovery
 
 The tool finds sessions by deriving a project slug from CWD using the same algorithm as Claude Code: `~/.claude/projects/<slug>/` where the slug is the absolute path with `/` replaced by `-`.
-
-## Integration with retro skill
-
-The `retro` skill (`~/.claude/skills/retro/SKILL.md`) includes a token usage step (Step 6) that runs `token-usage session` at the end of each session retrospective, ensuring usage is logged automatically.
-
-## Global CLAUDE.md rules
-
-A `Token Efficiency` section in `~/.claude/CLAUDE.md` provides four rules to reduce unnecessary token consumption:
-- Prefer targeted file reads over full-file reads
-- Run `pytest tests/ -q` by default
-- Use Glob/Grep with specific patterns
-- Avoid re-reading files already in context
 
 ## Development
 
