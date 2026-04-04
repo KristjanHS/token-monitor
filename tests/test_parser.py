@@ -440,9 +440,9 @@ class TestParseSubagents:
 class TestFindProjectLogDir:
     def test_valid_cwd_returns_path(self, tmp_path: Path):
         """Returns log dir when the slug-based directory exists."""
-        # Simulate CWD = /foo/bar → slug = --foo-bar
+        # Simulate CWD = /foo/bar → slug = -foo-bar
         fake_cwd = "/foo/bar"
-        slug = "-" + fake_cwd.replace("/", "-")  # "--foo-bar"
+        slug = fake_cwd.replace("/", "-")  # "-foo-bar"
         log_dir = tmp_path / ".claude" / "projects" / slug
         log_dir.mkdir(parents=True)
 
@@ -477,8 +477,8 @@ class TestFindProjectLogDir:
     def test_slug_construction(self):
         """Verify the slug format matches Claude Code convention."""
         cwd = "/home/user/projects/my-app"
-        expected_slug = "--home-user-projects-my-app"
-        slug = "-" + cwd.replace("/", "-")
+        expected_slug = "-home-user-projects-my-app"
+        slug = cwd.replace("/", "-")
         assert slug == expected_slug
 
 

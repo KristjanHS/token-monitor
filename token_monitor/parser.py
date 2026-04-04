@@ -134,8 +134,8 @@ def find_project_log_dir(cwd: str | None = None) -> str | None:
     if cwd is None:
         cwd = os.getcwd()
 
-    # Claude Code slug: replace / with -, prepend -
-    slug = "-" + cwd.replace("/", "-")
+    # Claude Code slug: replace / with - (leading / becomes the - prefix)
+    slug = cwd.replace("/", "-")
     log_dir = os.path.expanduser(f"~/.claude/projects/{slug}")
 
     if os.path.isdir(log_dir):
