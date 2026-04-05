@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from token_monitor.context import analyze_context, context_report
 from token_monitor.parser import (
@@ -107,7 +108,6 @@ def _cmd_context(args: argparse.Namespace) -> None:
             sys.exit(1)
         project_dir = log_dir
     else:
-        from pathlib import Path
         project_dir = str(Path(jsonl_path).parent)
 
     usage = parse_last_turn(jsonl_path)

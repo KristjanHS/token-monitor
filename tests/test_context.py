@@ -7,6 +7,7 @@ from token_monitor.context import (
     ComponentGroup,
     ContextSnapshot,
     FileEntry,
+    _scan_skill_descriptions,
     analyze_context,
     context_report,
     estimate_tokens,
@@ -50,6 +51,34 @@ class TestModelLimitFor:
 
     def test_unknown_defaults_to_opus(self) -> None:
         assert model_limit_for("gpt-4-turbo") == 200_000
+
+
+class TestScanSkillDescriptions:
+    def test_truncates_to_300_chars(self, tmp_path: Path) -> None:
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("x" * 500)
+
+        entries = _scan_skill_descriptions(tmp_path)
+
+        assert len(entries) == 1
+        assert entries[0].name == "my-skill"
+        # 300 chars (capped) / 3.5 = 85 tokens
+        assert entries[0].tokens == 85
+
+    def test_skips_dirs_without_skill_md(self, tmp_path: Path) -> None:
+        (tmp_path / "has-skill").mkdir()
+        (tmp_path / "has-skill" / "SKILL.md").write_text("content")
+        (tmp_path / "no-skill").mkdir()
+        (tmp_path / "no-skill" / "README.md").write_text("not a skill")
+
+        entries = _scan_skill_descriptions(tmp_path)
+
+        assert len(entries) == 1
+        assert entries[0].name == "has-skill"
+
+    def test_nonexistent_dir_returns_empty(self, tmp_path: Path) -> None:
+        assert _scan_skill_descriptions(tmp_path / "nope") == []
 
 
 class TestAnalyzeContext:
@@ -112,6 +141,19 @@ class TestAnalyzeContext:
 
         labels = [c.label for c in snapshot.components]
         assert "Project rules" in labels
+
+    def test_finds_skill_descriptions(self, tmp_path: Path) -> None:
+        skills_dir = tmp_path / ".claude" / "skills"
+        skill_a = skills_dir / "my-skill"
+        skill_a.mkdir(parents=True)
+        (skill_a / "SKILL.md").write_text("x" * 400)
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
+
+        snapshot = analyze_context(_usage(), str(proj_dir), cwd=str(tmp_path))
+
+        labels = [c.label for c in snapshot.components]
+        assert "Skill descriptions" in labels
 
     def test_snapshot_properties(self, tmp_path: Path) -> None:
         proj_dir = tmp_path / "proj"
