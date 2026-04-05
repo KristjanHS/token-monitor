@@ -33,6 +33,7 @@ python -m token_monitor session <path-to-jsonl>    # analyze specific session
 python -m token_monitor project                    # summarize all sessions in current project
 python -m token_monitor project <path-to-dir>      # summarize specific project
 token-usage session                                # installed entry point (same commands)
+token-usage context                                # analyze context window usage for current session
 
 # Run tests
 pytest tests/ -q
@@ -49,11 +50,13 @@ pytest tests/test_parser.py::test_name -q
 
 ## Architecture & Data Flow
 
-**CLI layer** (`cli.py`): argparse with two subcommands (`session`, `project`). Routes to `_cmd_session` or `_cmd_project`.
+**CLI layer** (`cli.py`): argparse with three subcommands (`session`, `project`, `context`). Routes to `_cmd_session`, `_cmd_project`, or `_cmd_context`.
 
 **Parser** (`parser.py`): Reads JSONL files line-by-line, extracts `message.usage` from `type: "assistant"` lines into `TurnUsage` dataclasses. Aggregates into `SessionStats` which computes derived metrics (peak context, model counts, context jumps) as properties. Also handles subagent discovery — looks for `<session-dir>/subagents/agent-*.jsonl` alongside the main session file.
 
 **Report** (`report.py`): Pure formatting. `session_report()` produces a text report with context growth bars and subagent summary. `project_report()` ranks sessions by peak context. `append_to_log()` writes a markdown table row to `~/.claude/token-usage-log.md`.
+
+**Context** (`context.py`): Measures trimmable context components (CLAUDE.md, memory index, rules, skill descriptions) by file size, combines with JSONL usage data. `analyze_context()` builds a `ContextSnapshot`, `context_report()` formats it. Used by the `/retro` skill's context review step.
 
 **Key flow**: `find_project_log_dir(CWD)` -> slug-based path lookup under `~/.claude/projects/` -> `find_latest_session()` or `find_all_sessions()` -> `parse_session()` -> `session_report()`/`project_report()` -> optional `append_to_log()`.
 
