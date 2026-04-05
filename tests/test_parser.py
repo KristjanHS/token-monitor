@@ -15,6 +15,7 @@ from token_monitor.parser import (
     find_all_sessions,
     find_latest_session,
     find_project_log_dir,
+    parse_last_turn,
     parse_session,
     parse_subagents,
 )
@@ -481,3 +482,53 @@ class TestShortModelName:
 
     def test_unknown_passthrough(self):
         assert _short_model_name("gpt-4-turbo") == "gpt-4-turbo"
+
+
+# ---------------------------------------------------------------------------
+# parse_last_turn()
+# ---------------------------------------------------------------------------
+
+
+class TestParseLastTurn:
+    def test_returns_last_turn_usage(self, tmp_path):
+        lines = [
+            _assistant_line(input_tokens=100, cache_creation=200, cache_read=300, output_tokens=50),
+            _assistant_line(input_tokens=500, cache_creation=100, cache_read=400, output_tokens=80),
+        ]
+        p = _make_session_file(tmp_path, lines=lines)
+        result = parse_last_turn(str(p))
+
+        assert result.input_tokens == 500
+        assert result.cache_creation == 100
+        assert result.cache_read == 400
+        assert result.output_tokens == 80
+        assert result.total_context == 1000  # 500+100+400
+        assert result.turns == 2
+
+    def test_empty_file_returns_zeros(self, tmp_path):
+        p = tmp_path / "empty.jsonl"
+        p.write_text("")
+        result = parse_last_turn(str(p))
+
+        assert result.total_context == 0
+        assert result.turns == 0
+        assert result.model == "unknown"
+
+    def test_skips_non_assistant_and_malformed(self, tmp_path):
+        lines = [
+            _human_line(),
+            "not json {{{",
+            _assistant_line(input_tokens=42, cache_creation=0, cache_read=0, output_tokens=10),
+        ]
+        p = _make_session_file(tmp_path, lines=lines)
+        result = parse_last_turn(str(p))
+
+        assert result.turns == 1
+        assert result.input_tokens == 42
+
+    def test_extracts_model(self, tmp_path):
+        lines = [_assistant_line(model="claude-opus-4-20250514")]
+        p = _make_session_file(tmp_path, lines=lines)
+        result = parse_last_turn(str(p))
+
+        assert result.model == "claude-opus-4-20250514"

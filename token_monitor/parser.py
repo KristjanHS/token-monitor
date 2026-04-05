@@ -156,6 +156,56 @@ def find_all_sessions(log_dir: str) -> list[str]:
     return sorted(glob.glob(os.path.join(log_dir, "*.jsonl")), key=os.path.getmtime)
 
 
+@dataclass
+class LastTurnUsage:
+    """Usage snapshot from the most recent assistant turn in a session."""
+    total_context: int
+    input_tokens: int
+    cache_creation: int
+    cache_read: int
+    output_tokens: int
+    model: str
+    turns: int
+
+
+def parse_last_turn(jsonl_path: str) -> LastTurnUsage:
+    """Extract usage data from the last assistant turn in a JSONL file."""
+    last_usage: dict = {}
+    last_model = "unknown"
+    turn_count = 0
+
+    with open(jsonl_path) as f:
+        for line in f:
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if obj.get("type") != "assistant":
+                continue
+            msg = obj.get("message", {})
+            usage = msg.get("usage")
+            if not usage:
+                continue
+            turn_count += 1
+            last_usage = usage
+            last_model = msg.get("model", "unknown")
+
+    input_tok = last_usage.get("input_tokens", 0)
+    cache_create = last_usage.get("cache_creation_input_tokens", 0)
+    cache_read = last_usage.get("cache_read_input_tokens", 0)
+    output_tok = last_usage.get("output_tokens", 0)
+
+    return LastTurnUsage(
+        total_context=input_tok + cache_create + cache_read,
+        input_tokens=input_tok,
+        cache_creation=cache_create,
+        cache_read=cache_read,
+        output_tokens=output_tok,
+        model=last_model,
+        turns=turn_count,
+    )
+
+
 def _short_model_name(model: str) -> str:
     """Convert model ID to short display name."""
     if "opus" in model:

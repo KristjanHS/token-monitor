@@ -497,3 +497,50 @@ class TestIntegration:
         # Peak context ranking — bbb has higher peak (3500 vs 800)
         assert "3,500" in out
         assert "Sessions by peak context:" in out
+
+
+# ---------------------------------------------------------------------------
+# context subcommand — explicit path
+# ---------------------------------------------------------------------------
+
+
+class TestContextExplicitPath:
+    """main(["context", <path>]) with an explicit JSONL file."""
+
+    def test_context_with_explicit_path(self, tmp_path, capsys):
+        jsonl = _make_jsonl(tmp_path / "ctx.jsonl")
+        main(["context", jsonl])
+        out = capsys.readouterr().out
+        assert "CONTEXT ANALYSIS" in out
+
+
+# ---------------------------------------------------------------------------
+# context subcommand — default path discovery
+# ---------------------------------------------------------------------------
+
+
+class TestContextDefaultPath:
+    """main(["context"]) without an explicit path — discovers via CWD."""
+
+    def test_context_default_discovers_latest(self, tmp_path, capsys, monkeypatch):
+        log_dir = tmp_path / "log_dir"
+        log_dir.mkdir()
+        _make_jsonl(log_dir / "sess.jsonl")
+        monkeypatch.setattr("token_monitor.cli.find_project_log_dir", lambda: str(log_dir))
+        main(["context"])
+        out = capsys.readouterr().out
+        assert "CONTEXT ANALYSIS" in out
+
+    def test_context_no_log_dir_exits(self, capsys, monkeypatch):
+        monkeypatch.setattr("token_monitor.cli.find_project_log_dir", lambda: None)
+        with pytest.raises(SystemExit) as exc_info:
+            main(["context"])
+        assert exc_info.value.code == 1
+
+    def test_context_no_jsonl_exits(self, tmp_path, capsys, monkeypatch):
+        log_dir = tmp_path / "empty"
+        log_dir.mkdir()
+        monkeypatch.setattr("token_monitor.cli.find_project_log_dir", lambda: str(log_dir))
+        with pytest.raises(SystemExit) as exc_info:
+            main(["context"])
+        assert exc_info.value.code == 1

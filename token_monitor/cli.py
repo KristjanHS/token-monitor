@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import sys
 
+from token_monitor.context import analyze_context, context_report
 from token_monitor.parser import (
     find_all_sessions,
     find_latest_session,
     find_project_log_dir,
+    parse_last_turn,
     parse_session,
 )
 from token_monitor.report import append_to_log, project_report, session_report
@@ -47,12 +49,25 @@ def main(argv: list[str] | None = None) -> None:
         help="Path to project log directory (default: derived from CWD)",
     )
 
+    # context subcommand
+    sp_context = subparsers.add_parser(
+        "context", help="Analyze current context window usage"
+    )
+    sp_context.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Path to JSONL file (default: most recent in current project)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "session":
         _cmd_session(args)
     elif args.command == "project":
         _cmd_project(args)
+    elif args.command == "context":
+        _cmd_context(args)
 
 
 def _cmd_session(args: argparse.Namespace) -> None:
@@ -75,6 +90,29 @@ def _cmd_session(args: argparse.Namespace) -> None:
     if not args.no_log:
         log_path = append_to_log(stats)
         print(f"Logged to {log_path}")
+
+
+def _cmd_context(args: argparse.Namespace) -> None:
+    jsonl_path = args.path
+
+    if jsonl_path is None:
+        log_dir = find_project_log_dir()
+        if log_dir is None:
+            print("Error: could not find project log directory for CWD.", file=sys.stderr)
+            print("Provide an explicit path: token-usage context <path.jsonl>", file=sys.stderr)
+            sys.exit(1)
+        jsonl_path = find_latest_session(log_dir)
+        if jsonl_path is None:
+            print(f"Error: no JSONL files found in {log_dir}", file=sys.stderr)
+            sys.exit(1)
+        project_dir = log_dir
+    else:
+        from pathlib import Path
+        project_dir = str(Path(jsonl_path).parent)
+
+    usage = parse_last_turn(jsonl_path)
+    snapshot = analyze_context(usage, project_dir)
+    print(context_report(snapshot))
 
 
 def _cmd_project(args: argparse.Namespace) -> None:
