@@ -11,6 +11,7 @@ import pytest
 from token_monitor.parser import (
     SessionStats,
     TurnUsage,
+    _resolve_worktree_main_repo,
     _short_model_name,
     find_all_sessions,
     find_latest_session,
@@ -385,6 +386,83 @@ class TestFindProjectLogDir:
         with unittest.mock.patch("os.path.expanduser", side_effect=fake_expanduser):
             result = find_project_log_dir("/nonexistent/project/path")
 
+        assert result is None
+
+    def test_worktree_cwd_falls_back_to_main_repo_slug(self, tmp_path: Path):
+        """When direct slug lookup fails, resolves worktree to main repo slug."""
+        # Layout:
+        #   tmp_path/main-repo/          <- main repo root
+        #   tmp_path/main-repo/.git/     <- real git dir
+        #   tmp_path/main-repo/.git/worktrees/feat/  <- worktree gitdir
+        #   tmp_path/worktree-checkout/  <- worktree working dir
+        #   tmp_path/worktree-checkout/.git  <- file pointing to gitdir
+
+        main_repo = tmp_path / "main-repo"
+        main_git = main_repo / ".git"
+        wt_gitdir = main_git / "worktrees" / "feat"
+        wt_gitdir.mkdir(parents=True)
+
+        # commondir in worktree gitdir points back to main .git
+        (wt_gitdir / "commondir").write_text("../..\n")
+
+        # Worktree checkout with .git file
+        wt_checkout = tmp_path / "worktree-checkout"
+        wt_checkout.mkdir()
+        (wt_checkout / ".git").write_text(f"gitdir: {wt_gitdir}\n")
+
+        # Create the Claude project dir for the MAIN repo slug (not the worktree)
+        main_slug = str(main_repo).replace("/", "-")
+        log_dir = tmp_path / ".claude" / "projects" / main_slug
+        log_dir.mkdir(parents=True)
+
+        original = os.path.expanduser
+
+        def fake_expanduser(p: str) -> str:
+            if p.startswith("~"):
+                return str(tmp_path) + p[1:]
+            return original(p)
+
+        with unittest.mock.patch("os.path.expanduser", side_effect=fake_expanduser):
+            result = find_project_log_dir(str(wt_checkout))
+
+        assert result == str(log_dir)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_worktree_main_repo()
+# ---------------------------------------------------------------------------
+
+
+class TestResolveWorktreeMainRepo:
+    def test_regular_git_repo_returns_none(self, tmp_path: Path):
+        """A .git directory (not file) means regular repo — no fallback."""
+        repo = tmp_path / "repo"
+        (repo / ".git").mkdir(parents=True)
+
+        result = _resolve_worktree_main_repo(str(repo))
+        assert result is None
+
+    def test_malformed_git_file_missing_gitdir_prefix(self, tmp_path: Path):
+        """A .git file without 'gitdir:' prefix returns None."""
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        (wt / ".git").write_text("not a gitdir pointer\n")
+
+        result = _resolve_worktree_main_repo(str(wt))
+        assert result is None
+
+    def test_malformed_git_file_missing_commondir(self, tmp_path: Path):
+        """A .git file with valid gitdir but no commondir file returns None."""
+        wt = tmp_path / "wt"
+        wt.mkdir()
+
+        # Create a gitdir target without commondir
+        gitdir = tmp_path / "fake-gitdir"
+        gitdir.mkdir()
+
+        (wt / ".git").write_text(f"gitdir: {gitdir}\n")
+
+        result = _resolve_worktree_main_repo(str(wt))
         assert result is None
 
 
