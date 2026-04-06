@@ -465,6 +465,42 @@ class TestResolveWorktreeMainRepo:
         result = _resolve_worktree_main_repo(str(wt))
         assert result is None
 
+    def test_happy_path_resolves_main_repo(self, tmp_path: Path):
+        """A proper worktree .git file resolves to the main repo root."""
+        # Set up main repo structure
+        main_repo = tmp_path / "main-repo"
+        worktree_gitdir = main_repo / ".git" / "worktrees" / "feat"
+        worktree_gitdir.mkdir(parents=True)
+        (worktree_gitdir / "commondir").write_text("../..\n")
+
+        # Set up worktree with .git file pointing to the gitdir
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        (wt / ".git").write_text(f"gitdir: {worktree_gitdir}\n")
+
+        result = _resolve_worktree_main_repo(str(wt))
+        assert result == str(main_repo)
+
+    def test_walk_up_from_subdirectory_inside_worktree(self, tmp_path: Path):
+        """Passing a subdirectory inside the worktree still resolves to main repo."""
+        # Set up main repo structure
+        main_repo = tmp_path / "main-repo"
+        worktree_gitdir = main_repo / ".git" / "worktrees" / "feat"
+        worktree_gitdir.mkdir(parents=True)
+        (worktree_gitdir / "commondir").write_text("../..\n")
+
+        # Set up worktree with .git file pointing to the gitdir
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        (wt / ".git").write_text(f"gitdir: {worktree_gitdir}\n")
+
+        # Create a nested subdirectory inside the worktree
+        subdir = wt / "src" / "components"
+        subdir.mkdir(parents=True)
+
+        result = _resolve_worktree_main_repo(str(subdir))
+        assert result == str(main_repo)
+
 
 # ---------------------------------------------------------------------------
 # find_latest_session()
