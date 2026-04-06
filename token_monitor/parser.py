@@ -140,6 +140,57 @@ def find_project_log_dir(cwd: str | None = None) -> str | None:
 
     if os.path.isdir(log_dir):
         return log_dir
+
+    # Fallback: resolve git worktree to main repo
+    main_root = _resolve_worktree_main_repo(cwd)
+    if main_root and main_root != cwd:
+        slug = main_root.replace("/", "-")
+        log_dir = os.path.expanduser(f"~/.claude/projects/{slug}")
+        if os.path.isdir(log_dir):
+            return log_dir
+
+    return None
+
+
+def _resolve_worktree_main_repo(cwd: str) -> str | None:
+    """If cwd is inside a git worktree, return the main repo root.
+
+    Walks up from cwd looking for a .git entry. If .git is a file
+    (worktree indicator), reads the gitdir pointer and commondir to
+    resolve the main repository root. Returns None for regular repos
+    or if resolution fails.
+    """
+    path = cwd
+    while path != os.path.dirname(path):  # stop at filesystem root
+        git_path = os.path.join(path, ".git")
+        if os.path.isfile(git_path):
+            # Worktree: .git is a file containing a gitdir pointer
+            try:
+                with open(git_path) as f:
+                    line = f.readline().strip()
+            except OSError:
+                return None
+            if not line.startswith("gitdir:"):
+                return None
+            gitdir = line[len("gitdir:"):].strip()
+            if not os.path.isabs(gitdir):
+                gitdir = os.path.normpath(os.path.join(path, gitdir))
+            # Read commondir to find the main .git directory
+            commondir_file = os.path.join(gitdir, "commondir")
+            if not os.path.isfile(commondir_file):
+                return None
+            try:
+                with open(commondir_file) as f:
+                    commondir = f.readline().strip()
+            except OSError:
+                return None
+            main_git_dir = os.path.normpath(os.path.join(gitdir, commondir))
+            # Main repo root is parent of the .git directory
+            return os.path.dirname(main_git_dir)
+        elif os.path.isdir(git_path):
+            # Regular repo, not a worktree — no fallback needed
+            return None
+        path = os.path.dirname(path)
     return None
 
 
