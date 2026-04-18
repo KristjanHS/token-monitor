@@ -60,6 +60,12 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Path to JSONL file (default: most recent in current project)",
     )
+    sp_context.add_argument(
+        "-b",
+        "--brief",
+        action="store_true",
+        help="Compact ~5-line output suitable for embedding in other tools",
+    )
 
     args = parser.parse_args(argv)
 
@@ -112,7 +118,7 @@ def _cmd_context(args: argparse.Namespace) -> None:
 
     usage = parse_last_turn(jsonl_path)
     snapshot = analyze_context(usage, project_dir)
-    print(context_report(snapshot))
+    print(context_report(snapshot, brief=args.brief))
 
 
 def _cmd_project(args: argparse.Namespace) -> None:

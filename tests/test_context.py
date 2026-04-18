@@ -235,3 +235,61 @@ class TestContextReport:
         report = context_report(self._snapshot())
         assert "state.md" in report
         assert "consider trimming" in report
+
+
+class TestContextReportBrief:
+    def _snapshot(
+        self,
+        pct_used: float = 25.0,
+        peak_file_tokens: int = 1400,
+    ) -> ContextSnapshot:
+        total = int(200_000 * pct_used / 100)
+        return ContextSnapshot(
+            usage=_usage(total_context=total),
+            model_limit=200_000,
+            autocompact_buffer=21_000,
+            components=[
+                ComponentGroup(
+                    "Project CLAUDE.md",
+                    [FileEntry("CLAUDE.md", peak_file_tokens, peak_file_tokens * 4)],
+                ),
+            ],
+            memory_files=[],
+            large_memory_files=[],
+            large_rule_files=[],
+        )
+
+    def test_brief_is_at_most_10_lines(self) -> None:
+        report = context_report(self._snapshot(), brief=True)
+        assert len(report.splitlines()) <= 10
+
+    def test_brief_contains_context_line(self) -> None:
+        report = context_report(self._snapshot(), brief=True)
+        assert "Context:" in report
+
+    def test_brief_contains_model_window_and_autocompact(self) -> None:
+        report = context_report(self._snapshot(), brief=True)
+        assert "window" in report
+        assert "Autocompact buffer:" in report
+        assert "Until autocompact:" in report
+
+    def test_brief_suppresses_small_peak(self) -> None:
+        # 1400 tokens = 0.7% of 200k window — below 5% threshold.
+        report = context_report(self._snapshot(peak_file_tokens=1400), brief=True)
+        assert "Peak trimmable:" not in report
+
+    def test_brief_surfaces_large_peak(self) -> None:
+        # 15000 tokens = 7.5% of 200k window — above 5% threshold.
+        report = context_report(self._snapshot(peak_file_tokens=15_000), brief=True)
+        assert "Peak trimmable:" in report
+        assert "CLAUDE.md" in report
+
+    def test_brief_emits_high_usage_warning(self) -> None:
+        report = context_report(self._snapshot(pct_used=85.0), brief=True)
+        assert "! Context over 80%" in report
+
+    def test_brief_omits_trimmable_components_header(self) -> None:
+        # Default verbose report has this; brief should not.
+        report = context_report(self._snapshot(), brief=True)
+        assert "TRIMMABLE COMPONENTS" not in report
+        assert "RECOMMENDATIONS" not in report

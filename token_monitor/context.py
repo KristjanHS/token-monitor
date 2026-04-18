@@ -204,8 +204,65 @@ def analyze_context(
     )
 
 
-def context_report(snapshot: ContextSnapshot) -> str:
+def _format_k(tokens: int) -> str:
+    """Format a token count compactly as e.g. '21k' or '1.2k'."""
+    if tokens < 1000:
+        return str(tokens)
+    k = tokens / 1000
+    return f"{k:.1f}k" if k < 10 else f"{int(round(k))}k"
+
+
+def _brief_report(snapshot: ContextSnapshot) -> str:
+    """Compact ~5-line context report suitable for embedding."""
+    limit = snapshot.model_limit
+    total = snapshot.usage.total_context
+    pct = snapshot.pct_used
+    headroom = snapshot.autocompact_headroom
+
+    lines: list[str] = []
+    lines.append(f"Model: {snapshot.usage.model} ({_format_k(limit)} window)")
+    lines.append(
+        f"Context: {pct:.1f}% "
+        f"({_format_k(total)} used / {_format_k(snapshot.free)} free)"
+    )
+    compact_line = (
+        f"Autocompact buffer: ~{_format_k(snapshot.autocompact_buffer)} "
+        f"({AUTOCOMPACT_BUFFER_PCT}%)"
+    )
+    if headroom > 0:
+        compact_line += f" | Until autocompact: ~{_format_k(headroom)}"
+    else:
+        compact_line += f" | ! {_format_k(-headroom)} past trigger"
+    lines.append(compact_line)
+
+    # Peak trimmable category, only if any single file exceeds 5% of window.
+    threshold = limit * 0.05
+    peak: tuple[str, FileEntry] | None = None
+    for component in snapshot.components:
+        for f in component.files:
+            if f.tokens >= threshold and (peak is None or f.tokens > peak[1].tokens):
+                peak = (component.label, f)
+    if peak is not None:
+        label, f = peak
+        file_pct = f.tokens / limit * 100
+        lines.append(
+            f"Peak trimmable: {label} / {f.name} "
+            f"~{_format_k(f.tokens)} ({file_pct:.1f}%)"
+        )
+
+    # Recommendations (only ! warnings, verbatim).
+    if headroom <= 0:
+        lines.append("! AUTOCOMPACT ACTIVE — context is being compressed")
+    elif pct > 80:
+        lines.append("! Context over 80% — autocompact will trigger soon")
+
+    return "\n".join(lines)
+
+
+def context_report(snapshot: ContextSnapshot, brief: bool = False) -> str:
     """Format a context analysis snapshot as a text report."""
+    if brief:
+        return _brief_report(snapshot)
     lines: list[str] = []
     total = snapshot.usage.total_context
     limit = snapshot.model_limit
