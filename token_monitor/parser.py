@@ -216,17 +216,34 @@ class LastTurnUsage:
     cache_read: int
     output_tokens: int
     model: str
-    turns: int
+
+
+_TAIL_CHUNK = 65536
 
 
 def parse_last_turn(jsonl_path: str) -> LastTurnUsage:
-    """Extract usage data from the last assistant turn in a JSONL file."""
+    """Extract usage data from the last assistant turn in a JSONL file.
+
+    Reads only the tail of the file — the last assistant turn is
+    virtually always within the final few KB, and scanning the whole
+    file (which can be multi-MB) to hit the bottom is wasted work.
+    Returns zero usage if the tail contains no assistant turn.
+    """
     last_usage: dict = {}
     last_model = "unknown"
-    turn_count = 0
-
-    with open(jsonl_path) as f:
-        for line in f:
+    try:
+        size = os.path.getsize(jsonl_path)
+    except OSError:
+        size = 0
+    if size > 0:
+        with open(jsonl_path, "rb") as f:
+            if size > _TAIL_CHUNK:
+                f.seek(size - _TAIL_CHUNK)
+                f.readline()  # discard possibly-partial first line
+            tail = f.read().decode("utf-8", errors="replace")
+        for line in reversed(tail.splitlines()):
+            if not line.strip():
+                continue
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
@@ -237,9 +254,9 @@ def parse_last_turn(jsonl_path: str) -> LastTurnUsage:
             usage = msg.get("usage")
             if not usage:
                 continue
-            turn_count += 1
             last_usage = usage
             last_model = msg.get("model", "unknown")
+            break
 
     input_tok = last_usage.get("input_tokens", 0)
     cache_create = last_usage.get("cache_creation_input_tokens", 0)
@@ -253,7 +270,6 @@ def parse_last_turn(jsonl_path: str) -> LastTurnUsage:
         cache_read=cache_read,
         output_tokens=output_tok,
         model=last_model,
-        turns=turn_count,
     )
 
 

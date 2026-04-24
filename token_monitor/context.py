@@ -129,6 +129,7 @@ def analyze_context(
     usage: LastTurnUsage,
     project_dir: str,
     cwd: str | None = None,
+    brief: bool = False,
 ) -> ContextSnapshot:
     """Build a complete context analysis.
 
@@ -137,6 +138,10 @@ def analyze_context(
         project_dir: Claude Code project log directory
             (e.g. ~/.claude/projects/-home-user-myproject/).
         cwd: Working directory of the project (default: os.getcwd()).
+        brief: If True, skip work only the verbose report consumes
+            (per-memory-file enumeration, large-file scans, skill
+            descriptions). Saves 2-3 dir walks + 20-50 file opens per
+            hot-path invocation.
     """
     if cwd is None:
         cwd = os.getcwd()
@@ -166,14 +171,28 @@ def analyze_context(
     if entry:
         components.append(ComponentGroup(label="Memory index (MEMORY.md)", files=[entry]))
 
-    # Rules (loaded when matching files are touched)
-    for label, dir_path in [
+    # Rules (loaded when matching files are touched). Capture entries for reuse
+    # by the large-rules filter below — avoids a second stat walk per dir.
+    rule_dirs = [
         ("Project rules", cwd_path / ".claude" / "rules"),
         ("Global rules", home / ".claude" / "rules"),
-    ]:
+    ]
+    rule_entries_by_dir: list[list[FileEntry]] = []
+    for label, dir_path in rule_dirs:
         entries = _measure_dir(dir_path)
+        rule_entries_by_dir.append(entries)
         if entries:
             components.append(ComponentGroup(label=label, files=entries))
+
+    if brief:
+        # Per-file cap (~85 tokens at 300-char cap / 3.5) means no skill
+        # can ever cross the 5% peak-trimmable threshold — skip the scan.
+        return ContextSnapshot(
+            usage=usage,
+            model_limit=limit,
+            autocompact_buffer=autocompact_buffer,
+            components=components,
+        )
 
     # Skill descriptions
     skills_dir = home / ".claude" / "skills"
@@ -187,11 +206,12 @@ def analyze_context(
     mem_files.sort(key=lambda f: f.size_bytes, reverse=True)
 
     large_mem = [f for f in mem_files if f.size_bytes > 2000]
-    large_rules: list[FileEntry] = []
-    for dir_path in [cwd_path / ".claude" / "rules", home / ".claude" / "rules"]:
-        for entry in _measure_dir(dir_path):
-            if entry.size_bytes > 3000:
-                large_rules.append(entry)
+    large_rules: list[FileEntry] = [
+        e
+        for entries in rule_entries_by_dir
+        for e in entries
+        if e.size_bytes > 3000
+    ]
 
     return ContextSnapshot(
         usage=usage,
@@ -272,7 +292,6 @@ def context_report(snapshot: ContextSnapshot, brief: bool = False) -> str:
     lines.append("CONTEXT ANALYSIS")
     lines.append("=" * 60)
     lines.append(f"Model:    {snapshot.usage.model} ({limit:,} token window)")
-    lines.append(f"Turns:    {snapshot.usage.turns}")
     lines.append("")
 
     # Usage bar

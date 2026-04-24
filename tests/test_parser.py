@@ -617,7 +617,6 @@ class TestParseLastTurn:
         assert result.cache_read == 400
         assert result.output_tokens == 80
         assert result.total_context == 1000  # 500+100+400
-        assert result.turns == 2
 
     def test_empty_file_returns_zeros(self, tmp_path):
         p = tmp_path / "empty.jsonl"
@@ -625,7 +624,6 @@ class TestParseLastTurn:
         result = parse_last_turn(str(p))
 
         assert result.total_context == 0
-        assert result.turns == 0
         assert result.model == "unknown"
 
     def test_skips_non_assistant_and_malformed(self, tmp_path):
@@ -637,7 +635,6 @@ class TestParseLastTurn:
         p = _make_session_file(tmp_path, lines=lines)
         result = parse_last_turn(str(p))
 
-        assert result.turns == 1
         assert result.input_tokens == 42
 
     def test_extracts_model(self, tmp_path):

@@ -188,7 +188,7 @@ class TestSessionNoLogFlag:
         called = []
 
         monkeypatch.setattr(
-            "token_monitor.cli.append_to_log",
+            "token_monitor.report.append_to_log",
             lambda stats: called.append(True) or "fake_path",
         )
         main(["session", jsonl, "--no-log"])
@@ -201,7 +201,7 @@ class TestSessionNoLogFlag:
         log_file = tmp_path / "token-usage-log.md"
 
         monkeypatch.setattr(
-            "token_monitor.cli.append_to_log",
+            "token_monitor.report.append_to_log",
             lambda stats: str(log_file),
         )
         main(["session", jsonl])
@@ -437,7 +437,7 @@ class TestIntegration:
         def patched_append(stats, log_path=None):
             return orig_append(stats, log_path=str(log_file))
 
-        monkeypatch.setattr("token_monitor.cli.append_to_log", patched_append)
+        monkeypatch.setattr("token_monitor.report.append_to_log", patched_append)
         main(["session", jsonl])
 
         out = capsys.readouterr().out

@@ -13,7 +13,6 @@ from token_monitor.parser import (
     parse_last_turn,
     parse_session,
 )
-from token_monitor.report import append_to_log, project_report, session_report
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -78,6 +77,8 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _cmd_session(args: argparse.Namespace) -> None:
+    from token_monitor.report import append_to_log, session_report
+
     jsonl_path = args.path
 
     if jsonl_path is None:
@@ -117,11 +118,13 @@ def _cmd_context(args: argparse.Namespace) -> None:
         project_dir = str(Path(jsonl_path).parent)
 
     usage = parse_last_turn(jsonl_path)
-    snapshot = analyze_context(usage, project_dir)
+    snapshot = analyze_context(usage, project_dir, brief=args.brief)
     print(context_report(snapshot, brief=args.brief))
 
 
 def _cmd_project(args: argparse.Namespace) -> None:
+    from token_monitor.report import project_report
+
     log_dir = args.path
 
     if log_dir is None:

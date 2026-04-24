@@ -23,12 +23,11 @@ def _usage(
     cache_read: int = 47000,
     output_tokens: int = 500,
     model: str = "claude-opus-4-6",
-    turns: int = 10,
 ) -> LastTurnUsage:
     return LastTurnUsage(
         total_context=total_context, input_tokens=input_tokens,
         cache_creation=cache_creation, cache_read=cache_read,
-        output_tokens=output_tokens, model=model, turns=turns,
+        output_tokens=output_tokens, model=model,
     )
 
 
